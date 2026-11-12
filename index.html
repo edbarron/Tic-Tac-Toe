@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>tic tac toe</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #faf7f2;
+      color: #2b2b2b;
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+
+    main {
+      width: min(88vw, 340px);
+      display: grid;
+      gap: 14px;
+    }
+
+    h1 {
+      margin: 0;
+      text-align: center;
+      font-size: .95rem;
+      font-weight: 500;
+      letter-spacing: .18em;
+      color: #8a8078;
+    }
+
+    form { display: flex; gap: 8px; }
+
+    input {
+      flex: 1;
+      min-width: 0;
+      padding: 8px 10px;
+      font: inherit;
+      color: inherit;
+      background: transparent;
+      border: 1px solid #e0d9cf;
+      border-radius: 6px;
+    }
+
+    input:focus {
+      outline: 2px solid #d94f4f;
+      outline-offset: 1px;
+    }
+
+    button {
+      font: inherit;
+      cursor: pointer;
+      padding: 8px 12px;
+      background: #fff;
+      color: inherit;
+      border: 1px solid #e0d9cf;
+      border-radius: 6px;
+    }
+
+    form button {
+      background: #2b2b2b;
+      color: #faf7f2;
+      border-color: #2b2b2b;
+    }
+
+    #restart { justify-self: center; }
+
+    button:active { transform: translateY(1px); }
+
+    #board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      aspect-ratio: 1;
+    }
+
+    .cell {
+      display: grid;
+      place-items: center;
+      padding: 0;
+      font-size: clamp(1.8rem, 9vw, 2.8rem);
+      background: #fff;
+      border: 1px solid #e0d9cf;
+      border-radius: 10px;
+      transition: background .12s, border-color .12s;
+    }
+
+    .cell:hover:not(:disabled) {
+      background: #fdfcf9;
+      border-color: #c9bfb2;
+    }
+
+    .cell:disabled { cursor: default; }
+    .cell.x { color: #d94f4f; }
+    .cell.o { color: #3a7ca5; }
+    .cell.win { background: #fff6f2; border-color: #d94f4f; }
+
+    #status {
+      margin: 0;
+      min-height: 1.2em;
+      text-align: center;
+      font-size: .8rem;
+      letter-spacing: .05em;
+      color: #8a8078;
+    }
+
+    #status.win { color: #d94f4f; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>tic tac toe</h1>
+    <form id="setup">
+      <input id="p1" type="text" placeholder="player one" maxlength="12" />
+      <input id="p2" type="text" placeholder="player two" maxlength="12" />
+      <button type="submit">start</button>
+    </form>
+    <div id="board"></div>
+    <p id="status"></p>
+    <button id="restart" type="button">restart</button>
+  </main>
+
+  <script>
+    const Player = (name, marker) => ({ name, marker });
+
+    const Gameboard = (() => {
+      const lines = [
+        [0, 1, 2], [3, 4, 5], [6, 7, 8],
+        [0, 3, 6], [1, 4, 7], [2, 5, 8],
+        [0, 4, 8], [2, 4, 6],
+      ];
+      let board = Array(9).fill("");
+
+      const get = () => board;
+      const reset = () => { board = Array(9).fill(""); };
+
+      const place = (i, mark) => {
+        if (board[i]) return false;
+        board[i] = mark;
+        return true;
+      };
+
+      const winner = () => {
+        for (const line of lines) {
+          const [a, b, c] = line;
+          if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+            return { marker: board[a], line };
+          }
+        }
+        return null;
+      };
+
+      const full = () => board.every(Boolean);
+
+      return { get, reset, place, winner, full };
+    })();
+
+    const Game = (() => {
+      let players = [];
+      let turn = 0;
+      let over = true;
+      let result = null;
+
+      const start = (name1, name2) => {
+        players = [
+          Player(name1.trim() || "player one", "X"),
+          Player(name2.trim() || "player two", "O"),
+        ];
+        turn = 0;
+        over = false;
+        result = null;
+        Gameboard.reset();
+        Display.render();
+      };
+
+      const play = (index) => {
+        if (over) return;
+        const player = players[turn];
+        if (!Gameboard.place(index, player.marker)) return;
+
+        const win = Gameboard.winner();
+
+        if (win) {
+          over = true;
+          result = { name: player.name, marker: player.marker, line: win.line };
+        } else if (Gameboard.full()) {
+          over = true;
+          result = {};
+        } else {
+          turn = 1 - turn;
+        }
+
+        Display.render();
+      };
+
+      return {
+        start,
+        play,
+        over: () => over,
+        result: () => result,
+        active: () => players[turn],
+      };
+    })();
+
+    const Display = (() => {
+      const boardEl = document.getElementById("board");
+      const statusEl = document.getElementById("status");
+      const formEl = document.getElementById("setup");
+      const p1 = document.getElementById("p1");
+      const p2 = document.getElementById("p2");
+      const restartBtn = document.getElementById("restart");
+
+      const cells = Array.from({ length: 9 }, (_, i) => {
+        const cell = document.createElement("button");
+        cell.type = "button";
+        cell.className = "cell";
+        cell.addEventListener("click", () => Game.play(i));
+        boardEl.appendChild(cell);
+        return cell;
+      });
+
+      const render = () => {
+        const board = Gameboard.get();
+        const result = Game.result();
+
+        cells.forEach((cell, i) => {
+          cell.textContent = board[i];
+          cell.className =
+            "cell" +
+            (board[i] === "X" ? " x" : board[i] === "O" ? " o" : "") +
+            (result?.line?.includes(i) ? " win" : "");
+          cell.disabled = Boolean(board[i]) || Game.over();
+        });
+
+        statusEl.className = "";
+
+        if (result?.marker) {
+          statusEl.textContent = `${result.name} wins`;
+          statusEl.className = "win";
+        } else if (result) {
+          statusEl.textContent = "a draw";
+        } else if (Game.over()) {
+          statusEl.textContent = "press start";
+        } else {
+          const active = Game.active();
+          statusEl.textContent = `${active.name} · ${active.marker}`;
+        }
+      };
+
+      formEl.addEventListener("submit", (event) => {
+        event.preventDefault();
+        Game.start(p1.value, p2.value);
+      });
+
+      restartBtn.addEventListener("click", () => {
+        Game.start(p1.value, p2.value);
+      });
+
+      render();
+
+      return { render };
+    })();
+  </script>
+</body>
+</html>
